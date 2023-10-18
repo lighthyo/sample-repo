@@ -1,0 +1,192 @@
+[Problem]
+docker pull docker.io/ubuntu
+ERROR: missing signature key
+
+[Search]
+https://www.ibm.com/docs/es/fci/6.5.0?topic=steps-upgrading-docker
+
+[Action]
+sudo yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-engine
+
+
+sudo yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+
+yum install -y docker-ce docker-ce-cli containerd.io
+
+<Edit::/usr/lib/systemd/system/docker.service>
+cp /usr/lib/systemd/system/docker.service /usr/lib/systemd/system/docker.service-original
+before)
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+after)
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --exec-opt native.cgroupdriver=systemd
+
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo systemctl enable docker
+
+[Result]
+>>> docker pull docker.io/ubuntu (success)
+
+===
+
+docker pull docker.io/ubuntu
+docker run -td --name ubuntu-latest docker.io/ubuntu:latest
+docker exec -it ubuntu:latest cat /etc/os-release
+
+docker pull docker.io/nginx
+docker run -d -p 8000:80 --name nginx-latest docker.io/nginx:latest
+
+[user@centos7 19]$ sudo netstat -anop | grep 8000
+[sudo] user의 암호: 
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      11073/docker-proxy   off (0.00/0/0)
+tcp6       0      0 :::8000                 :::*                    LISTEN      11079/docker-proxy   off (0.00/0/0)
+[user@centos7 19]$ ps -ef | grep 11073
+root     11073  9941  0 06:01 ?        00:00:00 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 8000 -container-ip 172.17.0.3 -container-port 80
+user     11332  5223  0 06:02 pts/0    00:00:00 grep --color=auto 11073
+[user@centos7 19]$ ps -ef | grep 9941
+root      9941     1  1 05:55 ?        00:00:08 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --exec-opt native.cgroupdriver=systemd
+root     11073  9941  0 06:01 ?        00:00:00 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 8000 -container-ip 172.17.0.3 -container-port 80
+root     11079  9941  0 06:01 ?        00:00:00 /usr/bin/docker-proxy -proto tcp -host-ip :: -host-port 8000 -container-ip 172.17.0.3 -container-port 80
+user     11348  5223  0 06:03 pts/0    00:00:00 grep --color=auto 9941
+[user@centos7 19]$ docker run -d -p 8000:80 --name nginx-latest docker.io/nginx:latest
+
+[Problem]
+
+echo "Hello, Docker." > hello-docker.txt
+vi Dockerfile
+"""
+FROM docker.io/centos:latest
+ADD hello-docker.txt /tmp
+RUN yum install -y epel-release
+CMD ["/bin/bash"]
+"""
+docker build -t widehyo/centos:1.0 .
+
+./Dockerfile
+./hello-docker.txt
+
+failed to download metadata for repo 'appstream'
+
+[Cause]
+yum.repos.d의 baseurl이 변경되어 epel-release를 찾을 수 없는 문제
+해결: yum.repos.d에 epel-release를 찾을 수 있는 url을 추가하고 재시작한다.
+
+[Search]
+https://www.inflearn.com/questions/771489/dockerfile-run-yum-install
+제가 테스트했을 때 참조하는 repo url과 사용하시는 yum repo url이 달라서 필요한 패키지를 가져오지 못하고 있는 상황으로 보입니다.
+https://linuxhostsupport.com/blog/how-to-set-up-and-use-yum-repositories-on-centos-7/
+https://ssjeong.tistory.com/entry/CentOS-yum-update-%EC%97%90%EB%9F%AC-%EB%B0%9C%EC%83%9D-%EC%8B%9C-%EC%A0%80%EC%9E%A5%EC%86%8C-%EC%B6%94%EA%B0%80
+
+[Action]
+before)
+FROM docker.io/centos:latest
+ADD hello-docker.txt /tmp
+RUN yum install -y epel-release
+CMD ["/bin/bash"]
+
+after)
+FROM docker.io/centos:latest
+ADD hello-docker.txt /tmp
+RUN cd /etc/yum.repos.d/; sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*; sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+RUN yum clean all
+RUN yum update -y
+RUN yum install -y epel-release
+CMD ["/bin/bash"]
+
+[Result]
+[user@centos7 19]$ !docker
+docker build -t widehyo/centos:1.0 .
+[+] Building 34.6s (11/11) FINISHED                                                                                                                                                                                            docker:default
+ => [internal] load build definition from Dockerfile                                                                                                                                                                                     0.0s
+ => => transferring dockerfile: 433B                                                                                                                                                                                                     0.0s
+ => [internal] load .dockerignore                                                                                                                                                                                                        0.0s
+ => => transferring context: 2B                                                                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/library/centos:latest                                                                                                                                                                         0.7s
+ => [internal] load build context                                                                                                                                                                                                        0.0s
+ => => transferring context: 96B                                                                                                                                                                                                         0.0s
+ => [1/6] FROM docker.io/library/centos:latest@sha256:a27fd8080b517143cbbbab9dfb7c8571c40d67d534bbdee55bd6c473f432b177                                                                                                                   0.0s
+ => CACHED [2/6] ADD hello-docker.txt /tmp                                                                                                                                                                                               0.0s
+ => CACHED [3/6] RUN cd /etc/yum.repos.d/; sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*; sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*                       0.0s
+ => CACHED [4/6] RUN yum clean all                                                                                                                                                                                                       0.0s
+ => [5/6] RUN yum update -y                                                                                                                                                                                                             30.0s
+ => [6/6] RUN yum install -y epel-release                                                                                                                                                                                                1.4s
+ => exporting to image                                                                                                                                                                                                                   2.4s 
+ => => exporting layers                                                                                                                                                                                                                  2.4s 
+ => => writing image sha256:282ab2e156be860e4d6d21e7b49666d4b0f6ab725e2f1abc38606972cb67087c                                                                                                                                             0.0s 
+ => => naming to docker.io/widehyo/centos:1.0  
+
+===
+
+Docker compose install
+
+https://docs.docker.com/compose/migrate/
+
+최신 버전의 도커는 기존의 docker-compose를 기본기능으로 제공한다
+docker compose로 접근한다.
+
+
+https://docs.docker.com/engine/install/centos/#set-up-the-repository
+
+
+[Problem]
+docker compose up -d
+
+(root) Additional property service is not allowed
+
+[Cause]
+docker-compose.yml 의 required property인 services가 없기 때문이다.
+
+[Search]
+https://docs.docker.com/compose/compose-file/03-compose-file/
+
+[Action]
+before)
+# database container
+db:
+    image: docker.io/mysql
+    ports:
+        - "3306:3306"
+    environment:
+        - MYSQL_ROOT_PASSWORD=password
+
+# application container
+app:
+    image: docker.io/tomcat
+    ports:
+        - "8080:8080"
+
+# web container
+web:
+    image: docker.io/nginx
+    ports:
+        - "80:80"
+after)
+services:
+    # database container
+    db:
+        image: docker.io/mysql
+        ports:
+            - "3306:3306"
+        environment:
+            - MYSQL_ROOT_PASSWORD=password
+
+    # application container
+    app:
+        image: docker.io/tomcat
+        ports:
+            - "8080:8080"
+
+    # web container
+    web:
+        image: docker.io/nginx
+        ports:
+            - "80:80"
