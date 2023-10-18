@@ -190,3 +190,38 @@ services:
         image: docker.io/nginx
         ports:
             - "80:80"
+
+===
+
+The following is executed in vagrant
+
+Jenkins install
+
+https://pkg.jenkins.io/redhat/
+
+  sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat/jenkins.repo
+  >>sudo wget --no-check-certificate -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat/jenkins.repo
+  sudo rpm --import https://pkg.jenkins.io/redhat/jenkins.io-2023.key
+
+  sudo yum install fontconfig java-17-openjdk
+  sudo yum install jenkins
+
+
+  sudo yum install java-17-openjdk
+ package java-17-openjdk available.
+
+https://velog.io/@koreakky/CentOS-7%EC%97%90-OpenJDK17-%EC%84%A4%EC%B9%98%ED%95%98%EA%B8%B0
+
+cd /tmp
+
+### Linux 64-bit ###
+wget https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz
+
+### Linux ARM64 ###
+wget https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-aarch64_bin.tar.gz
+
+tmp# tar -xvf openjdk-17.0.2_linux-x64_bin.tar.gz
+
+tmp# mv jdk-17.0.2/ /opt/jdk-17/
+
+# vi ~/.bashrc
